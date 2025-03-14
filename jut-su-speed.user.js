@@ -4,8 +4,8 @@
 // @version      1.0.1
 // @description  try to take over the world!
 // @author       flamesv and DrakonSeryoga
-// @updateURL    https://github.com/flamesv/jut.su-autoskip/raw/fixed-transition-to-the-next-season/userscript/tape-operator.user.js
-// @downloadURL  https://github.com/flamesv/jut.su-autoskip/raw/fixed-transition-to-the-next-season/userscript/tape-operator.user.js
+// @updateURL    https://github.com/flamesv/jut.su-autoskip/raw/fixed-transition-to-the-next-season/jut-su-speed.user.js
+// @downloadURL  https://github.com/flamesv/jut.su-autoskip/raw/fixed-transition-to-the-next-season/jut-su-speed.user.js
 // @match        *://jut.su/*
 // @icon         https://www.google.com/s2/favicons?domain=jut.su
 // @run-at       document-body
