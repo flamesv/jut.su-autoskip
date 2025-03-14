@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JUT SU SPEED
 // @namespace    http://tampermonkey.net/
-// @version      1.0.1
+// @version      1.0.2
 // @description  try to take over the world!
 // @author       flamesv and DrakonSeryoga
 // @updateURL    https://github.com/flamesv/jut.su-autoskip/raw/fixed-transition-to-the-next-season/jut-su-speed.user.js
