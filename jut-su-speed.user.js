@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JUT SU SPEED
 // @namespace    http://tampermonkey.net/
-// @version      1.0.3
+// @version      1.0.4
 // @description  automatically switches episodes, sets the desired speed, automatically skips the intro, marks episodes as watched
 // @author       flamesv and DrakonSeryoga
 // @updateURL    https://github.com/flamesv/jut.su-autoskip/raw/fixed-transition-to-the-next-season/jut-su-speed.user.js
