@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         JUT SU SPEED
 // @namespace    http://tampermonkey.net/
-// @version      1.0.2
-// @description  try to take over the world!
+// @version      1.0.3
+// @description  automatically switches episodes, sets the desired speed, automatically skips the intro, marks episodes as watched
 // @author       flamesv and DrakonSeryoga
 // @updateURL    https://github.com/flamesv/jut.su-autoskip/raw/fixed-transition-to-the-next-season/jut-su-speed.user.js
 // @downloadURL  https://github.com/flamesv/jut.su-autoskip/raw/fixed-transition-to-the-next-season/jut-su-speed.user.js
@@ -18,7 +18,11 @@ window.onload = () => {
 
     let playbackRate = 3;
     const regexBase64 = new RegExp('pview_id = "[0-9]{1,}"; eval\\( Base64.decode\\( (.+)" \\)', 'u')
-    
+
+    async function request(url) {
+        const response = await fetch(url)
+        return await response.text()
+    }
     async function fetchVideoSrc(url) {
         try {
             const response = await fetch(url);
@@ -36,8 +40,12 @@ window.onload = () => {
             if (!sourceElement) {
                 throw new Error('Элемент <source> не найден внутри <video>');
             }
+
             let base64Data = html.match(regexBase64);
-            return {src: sourceElement.src, base64Data: base64Data[1]};
+            const match = base64Data[0].match(/pview_id\s*=\s*"(\d+)"/);
+            const pviewId = match ? match[1] : null;
+
+            return {src: sourceElement.src, base64Data: base64Data[1], pview_id: pviewId};
         } catch (error) {
             console.error('Произошла ошибка:', error);
             return null;
@@ -123,11 +131,13 @@ window.onload = () => {
 
                 initSeasonAndEpisode = [initSeasonAndEpisode[0], initSeasonAndEpisode[1]+1]
                 nextEpisode = getNextEpisodeInfo(initSeasonAndEpisode);
+                let r = request(`/engine/ajax/previously_viewed_time.php?the_login_hash=${the_login_hash}&pview_id=${pview_id}&pview_category=${pview_category}&pview_id_seconds=${player.duration() - 1}&mark_as_viewed=yes&mark_as_restart=no`)
                 if (nextEpisode) {
                     nextEpisode.then((nextEpisodeInfo) => {
                         player.src({
                             src: nextEpisodeInfo['src']
                         });
+                        pview_id = nextEpisodeInfo.pview_id
                         let episodeData = Base64.decode(nextEpisodeInfo['base64Data'])
                         eval(episodeData)
                         initSeasonAndEpisode = [Number(pview_season), Number(pview_episode)]
