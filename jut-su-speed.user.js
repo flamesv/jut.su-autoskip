@@ -1,11 +1,11 @@
 // ==UserScript==
 // @name         JUT SU SPEED
 // @namespace    http://tampermonkey.net/
-// @version      1.0.1
-// @description  try to take over the world!
+// @version      1.0.4
+// @description  automatically switches episodes, sets the desired speed, automatically skips the intro, marks episodes as watched
 // @author       flamesv and DrakonSeryoga
-// @updateURL    https://github.com/flamesv/jut.su-autoskip/raw/main/userscript/tape-operator.user.js
-// @downloadURL  https://github.com/flamesv/jut.su-autoskip/raw/main/userscript/tape-operator.user.js
+// @updateURL    https://github.com/flamesv/jut.su-autoskip/raw/fixed-transition-to-the-next-season/jut-su-speed.user.js
+// @downloadURL  https://github.com/flamesv/jut.su-autoskip/raw/fixed-transition-to-the-next-season/jut-su-speed.user.js
 // @match        *://jut.su/*
 // @icon         https://www.google.com/s2/favicons?domain=jut.su
 // @run-at       document-body
@@ -16,18 +16,13 @@
 window.onload = () => {
     'use strict';
 
-    let playbackRate = 2;
+    let playbackRate = 3;
     const regexBase64 = new RegExp('pview_id = "[0-9]{1,}"; eval\\( Base64.decode\\( (.+)" \\)', 'u')
 
-    // предыдущая функция что делала запрос на фулскрин
-    function test() {
-        GM.xmlHttpRequest({
-            method: "GET",
-            url: "http://127.0.0.1:1234/test",
-            onload: function(response) {}
-        });
+    async function request(url) {
+        const response = await fetch(url)
+        return await response.text()
     }
-
     async function fetchVideoSrc(url) {
         try {
             const response = await fetch(url);
@@ -45,8 +40,12 @@ window.onload = () => {
             if (!sourceElement) {
                 throw new Error('Элемент <source> не найден внутри <video>');
             }
+
             let base64Data = html.match(regexBase64);
-            return {src: sourceElement.src, base64Data: base64Data[1]};
+            const match = base64Data[0].match(/pview_id\s*=\s*"(\d+)"/);
+            const pviewId = match ? match[1] : null;
+
+            return {src: sourceElement.src, base64Data: base64Data[1], pview_id: pviewId};
         } catch (error) {
             console.error('Произошла ошибка:', error);
             return null;
@@ -86,7 +85,7 @@ window.onload = () => {
         })
     }
 
-    let initSeasonAndEpisode = getInitialSeasonAndEpisode();
+    var initSeasonAndEpisode = getInitialSeasonAndEpisode();
 
     function injectBlock(text) {
         let getEpisodeBlock = document.getElementById('episodeBlock');
@@ -108,14 +107,17 @@ window.onload = () => {
     var started = 0;
     let nextEpisode;
     var startInterval = setInterval(() => {
-        if (document.getElementById('my-player_html5_api').readyState === 0 && started === 0) {
+        const skipIntroButton = Array.from(document.querySelectorAll('div.vjs-overlay')).find(el => el.innerText.includes('Пропустить заставку'));
+        if (skipIntroButton) {skipIntroButton.remove()}
+        const nextEpisodeButton = Array.from(document.querySelectorAll('div.vjs-overlay')).find(el => el.innerText.includes('Следующая серия'));
+        if (nextEpisodeButton) {nextEpisodeButton.remove()}
+        const listenOnAM = document.querySelector('div.vjs-overlay-listen-on-am');
+        if (listenOnAM) { listenOnAM.remove(); }
 
+        if (document.getElementById('my-player_html5_api').readyState === 0 && started === 0) {
             started = 1;
             player.playbackRate(playbackRate);
             player.play();
-
-            test()
-
         }
         try {
             if (player.currentTime() >= video_intro_start && player.currentTime() <= video_intro_end - 0.5) {
@@ -123,18 +125,22 @@ window.onload = () => {
             };
         } catch {}
         try {
-            if (player.currentTime() >= video_outro_start || player.currentTime() >= player.duration() - 0.5) {
+            if (player.currentTime() >= player.duration() - 0.5 || player.currentTime() >= video_outro_start) {
                 player.currentTime(0);
                 player.pause()
 
                 initSeasonAndEpisode = [initSeasonAndEpisode[0], initSeasonAndEpisode[1]+1]
                 nextEpisode = getNextEpisodeInfo(initSeasonAndEpisode);
+                let r = request(`/engine/ajax/previously_viewed_time.php?the_login_hash=${the_login_hash}&pview_id=${pview_id}&pview_category=${pview_category}&pview_id_seconds=${player.duration() - 1}&mark_as_viewed=yes&mark_as_restart=no`)
                 if (nextEpisode) {
                     nextEpisode.then((nextEpisodeInfo) => {
                         player.src({
                             src: nextEpisodeInfo['src']
                         });
-                        eval(Base64.decode(nextEpisodeInfo['base64Data']))
+                        pview_id = nextEpisodeInfo.pview_id
+                        let episodeData = Base64.decode(nextEpisodeInfo['base64Data'])
+                        eval(episodeData)
+                        initSeasonAndEpisode = [Number(pview_season), Number(pview_episode)]
                         currentEpisodeBlock.textContent = initSeasonAndEpisode[0] + ' - ' + initSeasonAndEpisode[1]
                         player.load();
                         started = 0;
