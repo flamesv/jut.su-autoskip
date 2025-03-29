@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         JUT SU SPEED
 // @namespace    http://tampermonkey.net/
-// @version      1.0.4
+// @version      1.0.5
 // @description  automatically switches episodes, sets the desired speed, automatically skips the intro, marks episodes as watched
 // @author       flamesv and DrakonSeryoga
 // @updateURL    https://github.com/flamesv/jut.su-autoskip/raw/fixed-transition-to-the-next-season/jut-su-speed.user.js
@@ -19,6 +19,41 @@ window.onload = () => {
     let playbackRate = 3;
     const regexBase64 = new RegExp('pview_id = "[0-9]{1,}"; eval\\( Base64.decode\\( (.+)" \\)', 'u')
 
+    function showModal(text) {
+        const modal = document.createElement('div');
+        modal.innerHTML = `
+        <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                    background: rgba(0, 0, 0, 0.5); display: flex;
+                    align-items: center; justify-content: center;
+                    z-index: 9999;">
+            <div style="background: white; padding: 20px; border-radius: 10px;
+                        position: relative; max-width: 300px; text-align: center;">
+                <span style="position: absolute; top: 5px; right: 10px;
+                             cursor: pointer; font-size: 20px; color: black;">&times;</span>
+                <p style="color: black; font-size: 16px; margin: 10px 0;">${text}</p>
+            </div>
+        </div>
+    `;
+
+        document.body.appendChild(modal);
+
+        // Закрытие по клику на крестик
+        modal.querySelector('span').onclick = () => modal.remove();
+
+        // Закрытие по Esc
+        document.addEventListener('keydown', function escHandler(e) {
+            if (e.key === 'Escape') {
+                modal.remove();
+                document.removeEventListener('keydown', escHandler);
+            }
+        });
+
+        // Если в полноэкранном режиме — добавить модальное окно внутрь плеера
+        const fullscreenElement = document.fullscreenElement || document.webkitFullscreenElement;
+        if (fullscreenElement) {
+            fullscreenElement.appendChild(modal);
+        }
+    }
     async function request(url) {
         const response = await fetch(url)
         return await response.text()
@@ -120,12 +155,12 @@ window.onload = () => {
             player.play();
         }
         try {
-            if (player.currentTime() >= video_intro_start && player.currentTime() <= video_intro_end - 0.5) {
+            if (player.currentTime() >= video_intro_start + 2 && player.currentTime() <= video_intro_end - 0.5) {
                 player.currentTime(video_intro_end);
             };
         } catch {}
         try {
-            if (player.currentTime() >= player.duration() - 0.5 || player.currentTime() >= video_outro_start) {
+            if (player.currentTime() >= player.duration() - 0.5 || player.currentTime() >= video_outro_start + 2) {
                 player.currentTime(0);
                 player.pause()
 
@@ -134,9 +169,16 @@ window.onload = () => {
                 let r = request(`/engine/ajax/previously_viewed_time.php?the_login_hash=${the_login_hash}&pview_id=${pview_id}&pview_category=${pview_category}&pview_id_seconds=${player.duration() - 1}&mark_as_viewed=yes&mark_as_restart=no`)
                 if (nextEpisode) {
                     nextEpisode.then((nextEpisodeInfo) => {
+                        if (!nextEpisodeInfo) {
+                            document.exitFullscreen()
+                            player.pause()
+                            showModal('Серии закончились :(')
+                            return
+                        }
                         player.src({
                             src: nextEpisodeInfo['src']
                         });
+
                         pview_id = nextEpisodeInfo.pview_id
                         let episodeData = Base64.decode(nextEpisodeInfo['base64Data'])
                         eval(episodeData)
